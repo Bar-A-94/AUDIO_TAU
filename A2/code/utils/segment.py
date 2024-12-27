@@ -22,10 +22,18 @@ def segment_audio_by_silence(file_name, min_silence_len=200, silence_thresh=-40,
     audio = AudioSegment.from_file(input_path)
     audio = audio.set_frame_rate(16000)
 
+    if file_name == "nirit" or file_name == "yaron":
+        audio = audio[1000:]
     
     # Detect non-silent segments
     nonsilent_ranges = detect_nonsilent(audio, min_silence_len=min_silence_len, silence_thresh=silence_thresh)
     
+    # Filter out non-silent segments that are less than 20 milliseconds long
+    nonsilent_ranges = [(start, end) for start, end in nonsilent_ranges if (end - start) >= 20]
+
+    if file_name=="guy":
+        nonsilent_ranges = nonsilent_ranges[0:8] + nonsilent_ranges[9:]
+
     # Add a buffer to each segment
     buffered_segments = [(max(start - buffer_ms, 0), min(end + buffer_ms, len(audio)))
                             for start, end in nonsilent_ranges]
@@ -40,3 +48,8 @@ def segment_audio_by_silence(file_name, min_silence_len=200, silence_thresh=-40,
 if __name__ == "__main__":
     segment_audio_by_silence("bar")
     segment_audio_by_silence("neta")
+    segment_audio_by_silence("avital")
+    segment_audio_by_silence("yaron")
+    segment_audio_by_silence("nirit")
+    segment_audio_by_silence("guy")
+
