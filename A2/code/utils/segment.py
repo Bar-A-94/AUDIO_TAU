@@ -41,7 +41,7 @@ def segment_audio_by_silence(file_name, min_silence_len=200, silence_thresh=-40,
     # Save each segment as a separate file
     for i, (start, end) in enumerate(buffered_segments):
         segment = audio[start:end]
-        output_path = os.path.join(output_dir, file_name + f"_segment_{i}.wav")
+        output_path = os.path.join(output_dir, file_name + f"_{i}.wav")
         segment.export(output_path, format="wav")
         print(f"Segment saved: {output_path}")
 
@@ -51,11 +51,4 @@ if __name__ == "__main__":
         if file_name.endswith(".wav"):
             name = os.path.splitext(file_name)[0]
             segment_audio_by_silence(name)
-
-    # segment_audio_by_silence("bar")
-    # segment_audio_by_silence("neta")
-    # segment_audio_by_silence("avital")
-    # segment_audio_by_silence("yaron")
-    # segment_audio_by_silence("nirit")
-    # segment_audio_by_silence("guy")
 

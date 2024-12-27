@@ -28,13 +28,13 @@ def q1c_mel_spec(input_dir, output_dir, window_size=0.025, hop_size=0.01, n_mels
             audio, sr = librosa.load(file_path, sr=16000)
 
             # Calculate the Mel spectrogram
-            mel_dict[file_name] = librosa.feature.melspectrogram(y=audio, sr=sr, n_fft=n_fft, hop_length=hop_length, n_mels=n_mels)
+            mel_dict[os.path.splitext(file_name)[0]] = librosa.feature.melspectrogram(y=audio, sr=sr, n_fft=n_fft, hop_length=hop_length, n_mels=n_mels)
 
             # Save the spectrogram as an image
             output_path = os.path.join(output_dir, f"{os.path.splitext(file_name)[0]}_mel.png")
             plt.figure(figsize=(10, 4))
             librosa.display.specshow(
-                mel_dict[file_name],
+                mel_dict[os.path.splitext(file_name)[0]],
                 sr=sr,
                 hop_length=hop_length,
                 x_axis="time",
@@ -80,7 +80,30 @@ def q3b_DTW(mel_1, mel_2):
                                                 distance_matrix[i, j - 1])    # Deletion
             
     return distance_matrix[mel_1.shape[1] - 1, mel_2.shape[1] - 1]
-                                          
+
+def q3_distance_matrix(mel_dict):
+    distance_matrix = np.zeros((4,10,10))
+    for x, name in enumerate(["neta", "avital","yaron","guy"]):
+        for i in range(10):
+            for j in range(10):
+                distance_matrix[x, i, j]=q3b_DTW(mel_dict[name +"_" + str(i)], mel_dict["bar_" + str(j)])
+
+        # Plot heatmaps for each table with values inside
+        plt.figure(figsize=(10, 8))
+        heatmap = plt.imshow(distance_matrix[x], cmap='viridis', interpolation='nearest')
+        plt.colorbar(label='DTW Distance')
+        plt.title(f"Heatmap of DTW Distances for {name}", fontsize=14)
+        plt.xlabel("Bar Index")
+        plt.ylabel(f"{name} Index")
+        plt.xticks(ticks=np.arange(10), labels=[f"Bar_{i}" for i in range(10)])
+        plt.yticks(ticks=np.arange(10), labels=[f"{name}_{i}" for i in range(10)])
+        for i in range(10):
+            for j in range(10):
+                plt.text(j, i, f"{distance_matrix[x][i, j]:.2f}",
+                     ha="center", va="center", color="white" if heatmap.norm(distance_matrix[x][i, j]) > 0.5 else "black")
+    plt.tight_layout()
+    plt.show()
+
 def q5a_collapse_B(string):
     collapsed = ""
     for i in range(len(string)):
@@ -92,22 +115,86 @@ def q5a_collapse_B(string):
                 collapsed = collapsed + string[i]
     return collapsed
 
+def path_finder(string,labels, matrix):
+    paths = []
+    def genrate_path(string, current_path, index):
+        if index == matrix.shape[0]:
+            if string =="":
+                paths.append(current_path)
+        else:
+            # Move forward in the string
+            if string != "":
+                # If the last character taken is the same as the next one, don't cut the string
+                if current_path!=[] and current_path[-1][1] == labels[string[0]]:
+                    genrate_path(string, current_path + [(index, labels[string[0]])], index + 1)
+                # If it's a new character cut the string, chose the node and move forward
+                else:
+                    genrate_path(string[1:], current_path + [(index, labels[string[0]])], index + 1)
+            # Check the blank character
+            genrate_path(string, current_path +[(index, labels["^"])], index + 1)
+            # Check for last character continuation
+            if current_path!=[]:
+                if current_path[-1][1]!=labels["^"]:
+                    genrate_path(string, current_path +[(index, current_path[-1][1])], index + 1)
+
+    genrate_path(string, [], 0)
+    return paths
+
+def q5_ctc_forward(string, labels, matrix):
+    paths = path_finder(string, labels, matrix)
+    total_prob = 0
+    for path in paths:
+        path_prob = 1
+        for node in path:
+            path_prob *= matrix[node]
+        total_prob += path_prob
+    return total_prob
+
+def plot_pred(pred, labels):
+    """
+    Plot the prediction matrix with labels for the y-axis and include values in each cell.
+
+    Args:
+        pred (np.ndarray): Prediction matrix (shape: T x |labels|).
+        labels (dict): Dictionary mapping labels to indices.
+    """
+    # Reverse the labels dictionary to map indices to label names
+    reversed_labels = {v: k for k, v in labels.items()}
+    y_ticks = [reversed_labels[i] for i in range(pred.shape[1])]
+
+    # Create the plot
+    plt.figure(figsize=(8, 6))
+    heatmap = plt.imshow(pred.T, cmap='viridis', aspect='auto')  # Transpose to align y-axis with labels
+    plt.colorbar(label='Prediction Value')
+    
+    # Set axis labels
+    plt.xlabel('Time Step')
+    plt.ylabel('Labels')
+    plt.yticks(ticks=np.arange(len(y_ticks)), labels=y_ticks)
+    plt.title('Prediction Heatmap')
+    
+    # Add values to each cell
+    for i in range(pred.shape[1]):  # Iterate over rows (labels)
+        for j in range(pred.shape[0]):  # Iterate over columns (time steps)
+            value = pred[j, i]
+            color = "white" if heatmap.norm(value) > 0.5 else "black"  # Contrast for better visibility
+            plt.text(j, i, f"{value:.2f}", ha='center', va='center', color=color)
+    
+    # Display the plot
+    plt.tight_layout()
+    plt.show()
 
 if __name__ == "__main__":
 
     # Question 1.c - mel spectrogram for each audio file
     input_dir = os.path.join("A2", "resources", "audio_files", "segmented")
     output_dir = os.path.join("A2", "resources", "mel_spectrogram")
-    mel_dict = q1c_mel_spec(input_dir, output_dir)
+    # mel_dict = q1c_mel_spec(input_dir, output_dir)
 
-    # Class representative - bar, Training set - Neta + ? + ? + ?, Evaluation Set - ? + ? + ? + ?
+    # Class representative - bar, Training set - neta + avital + yaron + guy, Evaluation Set - roni + nirit + ? + ?
 
     # Question 2 - DTW
-    for file_name_1 in os.listdir(input_dir):
-        if file_name_1.startswith("bar") and file_name_1.endswith(".wav"):
-            for file_name_2 in os.listdir(input_dir):
-                if file_name_2.startswith("neta") and file_name_2.endswith(".wav"):
-                    print(file_name_1 + " from " + file_name_2 + " is " + str(q3b_DTW(mel_dict[file_name_1], mel_dict[file_name_2])))
+    # q3_distance_matrix(mel_dict)
 
     # Question 5 - CTC
     # Define pred by 5.b
@@ -122,5 +209,23 @@ if __name__ == "__main__":
     pred[3][1] = 0.8
     pred[3][2] = 0.11
     pred[4][2] = 1.00
-                    
+    log_pred = np.log(pred)
+
+    labels = {'a': 0,'b': 1, '^':2}
+
+    # plot_pred(pred, labels)
+
+    # plot_pred(log_pred, labels)
+
+    print(q5_ctc_forward("abb",labels, pred)) # 0.85
+    print(q5_ctc_forward("ab",labels, pred)) # 0.54
+    print(q5_ctc_forward("aba",labels, pred)) # 0.88
+
+
+
+
+
+
+    
+
 
