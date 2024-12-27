@@ -3,7 +3,7 @@ from pydub.silence import detect_nonsilent
 import os
 import scipy
 
-def segment_audio_by_silence(file_name, min_silence_len=200, silence_thresh=-40, buffer_ms=200):
+def segment_audio_by_silence(file_name, min_silence_len=200, silence_thresh=-40, buffer_ms=500):
     """
     Segments an audio file into multiple files based on silence detection.
 
@@ -46,10 +46,16 @@ def segment_audio_by_silence(file_name, min_silence_len=200, silence_thresh=-40,
         print(f"Segment saved: {output_path}")
 
 if __name__ == "__main__":
-    segment_audio_by_silence("bar")
-    segment_audio_by_silence("neta")
-    segment_audio_by_silence("avital")
-    segment_audio_by_silence("yaron")
-    segment_audio_by_silence("nirit")
-    segment_audio_by_silence("guy")
+    input_dir = os.path.join("A2", "resources", "audio_files", "raw")
+    for file_name in os.listdir(input_dir):
+        if file_name.endswith(".wav"):
+            name = os.path.splitext(file_name)[0]
+            segment_audio_by_silence(name)
+
+    # segment_audio_by_silence("bar")
+    # segment_audio_by_silence("neta")
+    # segment_audio_by_silence("avital")
+    # segment_audio_by_silence("yaron")
+    # segment_audio_by_silence("nirit")
+    # segment_audio_by_silence("guy")
 
