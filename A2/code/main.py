@@ -151,8 +151,56 @@ def q5_ctc_forward(string, labels, matrix):
             # Transition with skiping over blank
             if l > 1 and extended_string[l] != extended_string[l - 2]:
                 forward_matrix[t, l] += prob_l * forward_matrix[t - 1, l - 2]
-    plot_pred(forward_matrix, labels)
     return forward_matrix[-1, -1] + forward_matrix[-1, -2]
+
+def q6_ctc_align(string, labels, matrix):
+    # Extend ground truth with blanks
+    path = []
+    blank = "^"
+    extended_string="^"
+    for c in string:
+        extended_string += c + blank
+    forward_matrix = np.zeros((matrix.shape[0], len(extended_string)))
+    backtrace_matrix = np.full((matrix.shape[0], len(extended_string)), -1, dtype=int)
+
+    forward_matrix[0, 0] = matrix[0, labels["^"]]
+    forward_matrix[0, 1] = matrix[0, labels[extended_string[1]]]
+    backtrace_matrix[0, 0] = 0
+    backtrace_matrix[0, 1] = 0
+
+    for t in range(1, matrix.shape[0]):
+        for l in range(0,len(extended_string)):
+            prob_l = matrix[t, labels[extended_string[l]]]
+            # Stay at current level
+            forward_matrix[t, l] = prob_l * forward_matrix[t - 1, l]
+            backtrace_matrix[t, l] = l
+            # Transition from previous label
+            if l > 0:
+                forward_matrix[t, l] = max(forward_matrix[t,l], prob_l * forward_matrix[t - 1, l - 1])
+                backtrace_matrix[t, l] = l - 1
+            # Transition with skiping over blank
+            if l > 1 and extended_string[l] != extended_string[l - 2]:
+                forward_matrix[t, l] = max(forward_matrix[t,l], prob_l * forward_matrix[t - 1, l - 2])
+                backtrace_matrix[t, l] = l - 2
+    
+    # Backtrace to find the most probable path
+    if forward_matrix[-1, -1] > forward_matrix[-1, -2]:
+        current = len(extended_string) - 1
+        best_score = forward_matrix[-1, -1]
+    else:
+        current = len(extended_string) - 2
+        best_score = forward_matrix[-1, -2]
+    
+    most_probable_path = []
+
+    for t in range(matrix.shape[0] - 1, -1, -1):
+        most_probable_path.append(int(current))
+        current = backtrace_matrix[t, current]
+
+    most_probable_path.reverse()
+    most_probable_labels = [extended_string[i] for i in most_probable_path]
+
+    return most_probable_labels, best_score
 
 def plot_pred(pred, labels):
     """
@@ -209,7 +257,9 @@ if __name__ == "__main__":
 
     # print(q5_ctc_forward("abb",labels, pred)) # 0.00
     # print(q5_ctc_forward("ab",labels, pred)) # 0.548
-    print(q5_ctc_forward("aba",labels, pred)) # 0.088
+    # print(q5_ctc_forward("aba",labels, pred)) # 0.088
+
+    # print(q6_ctc_align("aba", labels, pred)) # (['^', 'a', 'b', 'a', '^'], np.float64(0.04032000211715699))
 
 
 
