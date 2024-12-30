@@ -34,6 +34,13 @@ def segment_audio_by_silence(file_name, min_silence_len=200, silence_thresh=-40,
     if file_name=="guy":
         nonsilent_ranges = nonsilent_ranges[0:8] + nonsilent_ranges[9:]
 
+    if file_name=="rom":
+        nonsilent_ranges = nonsilent_ranges[0:5] + nonsilent_ranges[6:]
+
+    if file_name=="ohad":
+        nonsilent_ranges = nonsilent_ranges[0:4] + nonsilent_ranges[5:]
+        nonsilent_ranges[6] = (nonsilent_ranges[6][0]+250, nonsilent_ranges[6][1])
+
     # Add a buffer to each segment
     buffered_segments = [(max(start - buffer_ms, 0), min(end + buffer_ms, len(audio)))
                             for start, end in nonsilent_ranges]

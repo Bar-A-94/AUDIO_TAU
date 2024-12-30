@@ -1,8 +1,6 @@
 2d - at the end of the audio agregating
 3d-h - at the end of the audio agregating
-5d - consider add log version
-6 d + e
-7 d + e
+
 Questions:
     1. why there is diffrence between gt and text to align?
     2. 5d - should i plot the pred matrix that was given or the forward matrix?

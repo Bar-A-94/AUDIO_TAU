@@ -62,36 +62,47 @@ def q3b_DTW(mel_1, mel_2):
     Returns:
         float: The total alignment cost (DTW distance) between the two Mel spectrograms.
     """
-    distance_matrix = np.zeros((mel_1.shape[1], mel_2.shape[1]))
-    distance_matrix[0][0] = 0
+    dtw_cost = np.zeros((mel_1.shape[1], mel_2.shape[1]))
+    dtw_cost[0][0] = 0
 
     # Fill the first row
     for j in range(1, mel_2.shape[1]):
-        distance_matrix[0, j] = distance_matrix[0, j - 1] + np.linalg.norm(mel_1[:, 0] - mel_2[:, j])
+        dtw_cost[0, j] = dtw_cost[0, j - 1] + np.linalg.norm(mel_1[:, 0] - mel_2[:, j])
 
     # Fill the first column
     for i in range(1, mel_1.shape[1]):
-        distance_matrix[i, 0] = distance_matrix[i - 1, 0] + np.linalg.norm(mel_1[:, i] - mel_2[:, 0])
+        dtw_cost[i, 0] = dtw_cost[i - 1, 0] + np.linalg.norm(mel_1[:, i] - mel_2[:, 0])
 
     for i in range(1, mel_1.shape[1]):
         for j in range(1, mel_2.shape[1]):
             cost = np.linalg.norm(mel_1[:, i] - mel_2[:, j])  # Euclidean distance
-            distance_matrix[i, j] = cost + min(distance_matrix[i - 1, j - 1], # Match
-                                                distance_matrix[i - 1, j],    # Insertion
-                                                distance_matrix[i, j - 1])    # Deletion
+            dtw_cost[i, j] = cost + min(dtw_cost[i - 1, j - 1], # Match
+                                                dtw_cost[i - 1, j],    # Insertion
+                                                dtw_cost[i, j - 1])    # Deletion
             
-    return distance_matrix[mel_1.shape[1] - 1, mel_2.shape[1] - 1]
+    return dtw_cost[mel_1.shape[1] - 1, mel_2.shape[1] - 1]
 
 def q3_distance_matrix(mel_dict):
+
     distance_matrix = np.zeros((4,10,10))
+    db = "rom"
     for x, name in enumerate(["neta", "avital","yaron","guy"]):
         for i in range(10):
             for j in range(10):
-                distance_matrix[x, i, j]=q3b_DTW(mel_dict[name +"_" + str(i)], mel_dict["bar_" + str(j)])
+                distance_matrix[x, i, j]=q3b_DTW(mel_dict[name +"_" + str(i)], mel_dict[db + "_" + str(j)])
 
         # Plot heatmaps for each table with values inside
         plt.figure(figsize=(10, 8))
-        heatmap = plt.imshow(distance_matrix[x], cmap='viridis', interpolation='nearest')
+        # Normalize each row separately
+        normalized = np.zeros_like(distance_matrix[x])
+        for t in range(distance_matrix[x].shape[0]):  # For each time step
+            row_min = distance_matrix[x][t, :].min()
+            row_max = distance_matrix[x][t, :].max()
+            if row_max > row_min:  # Avoid division by zero
+                normalized[t, :] = (distance_matrix[x][t, :] - row_min) / (row_max - row_min)
+            else:
+                normalized[t, :] = 0
+        heatmap = plt.imshow(normalized, cmap='viridis', interpolation='nearest')
         plt.colorbar(label='DTW Distance')
         plt.title(f"Heatmap of DTW Distances for {name}", fontsize=14)
         plt.xlabel("Bar Index")
@@ -336,32 +347,28 @@ def plot_pred_backward(name, backtrace_matrix, labels, most_probable_path):
     print(f"{name} plot saved: {os.path.join(output_dir, 'plots')}")
 
 if __name__ == "__main__":
-
-    # Question 1.c - mel spectrogram for each audio file
+    # Initialize
     input_dir = os.path.join("A2", "resources", "audio_files", "segmented")
     output_dir = os.path.join("A2", "resources")
-    # mel_dict = q1c_mel_spec(input_dir, os.path.join(output_dir,"mel_spectrogram")
-
     # Class representative - bar, Training set - neta + avital + yaron + guy, Evaluation Set - roni + nirit + ? + ?
 
-    # Question 2 - DTW
-    # q3_distance_matrix(mel_dict)
+    # Question 2 - Mel-spectrogram
+    mel_dict = q1c_mel_spec(input_dir, os.path.join(output_dir,"mel_spectrogram"))
 
-    # Question 5 - CTC
-    pred, labels = q5a_initialize_pred()
+    # Question 3 - DTW
+    q3_distance_matrix(mel_dict)
 
-    # print(q5_ctc_forward("abb",labels, pred)) # 0.00
-    # print(q5_ctc_forward("ab",labels, pred)) # 0.548
+    # # Question 5 - CTC
+    # pred, labels = q5a_initialize_pred()
     # print(q5_ctc_forward("aba",labels, pred)) # 0.088
 
-    print(q6_ctc_align("q6d&e","aba", labels, pred)) # (['^', 'a', 'b', 'a', '^'], np.float64(0.04032000211715699))
+    # # Question 6 - CTC align
+    # print(q6_ctc_align("q6d&e","aba", labels, pred)) # (['^', 'a', 'b', 'a', '^'], np.float64(0.04032000211715699))
     
-    # Question 7
-    data = pkl.load(open('A2/supplied_files/force_align.pkl', 'rb'))
-    labels = {v: k for k, v in data['label_mapping'].items()}
-    print(q6_ctc_align("q7d&e",data['text_to_align'], labels, data['acoustic_model_out_probs'])) # (['^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', 't', 'h', 'e', 'n', ' ', 'g', 'o', '^', 'o', 'd', 'b', 'y', 'e', ' ', 's', 'a', 'i', 'd', ' ', 'r', 'a', 't', 's', ' ', 't', 'h', 'e', 'y', ' ', 'w', 'a', 'n', 't', ' ', 'h', 'o', 'm', 'e', '^'], np.float64(1.5022820406499606e-30))
-
-
+    # # Question 7
+    # data = pkl.load(open('A2/supplied_files/force_align.pkl', 'rb'))
+    # labels = {v: k for k, v in data['label_mapping'].items()}
+    # print(q6_ctc_align("q7d&e",data['text_to_align'], labels, data['acoustic_model_out_probs'])) # (['^', '^', '^', '^', '^', '^', '^', 't', 'h', 'e', '^', 'n', 'n', '^', ' ', ' ', '^', 'g', '^', 'o', '^', 'o', 'd', '^', '^', '^', '^', 'b', 'y', '^', 'e', '^', '^', '^', '^', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', '^', 's', '^', 'a', 'i', 'd', ' ', ' ', ' ', ' ', ' ', ' ', 'r', 'r', 'a', 't', 't', '^', '^', 's', '^', '^', '^', '^', '^', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', 't', 'h', 'e', 'y', ' ', ' ', ' ', ' ', ' ', ' ', '^', 'w', '^', 'a', 'n', 'n', 't', 't', '^', '^', '^', '^', '^', '^', '^', ' ', ' ', '^', 'h', 'o', 'm', '^', 'e', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^'], np.float64(1.5022820406499606e-30))
 
 
 
