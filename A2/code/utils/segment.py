@@ -1,6 +1,8 @@
 from pydub import AudioSegment
 from pydub.silence import detect_nonsilent
 import os
+import librosa
+import numpy as np
 import scipy
 
 def segment_audio_by_silence(file_name, min_silence_len=200, silence_thresh=-40, buffer_ms=500):
@@ -18,9 +20,14 @@ def segment_audio_by_silence(file_name, min_silence_len=200, silence_thresh=-40,
     output_dir = os.path.join("A2", "resources", "audio_files", "segmented")
     os.makedirs(output_dir, exist_ok=True)
     
-    # Load the audio file
+    #  Load audio and resample
     audio = AudioSegment.from_file(input_path)
-    audio = audio.set_frame_rate(16000)
+    original_sr = audio.frame_rate
+    audio = np.array(audio.get_array_of_samples(), dtype=np.float32) / 32768.0  # Normalize to [-1, 1]
+    
+    if original_sr != 16000:
+        audio = librosa.resample(audio, orig_sr=original_sr, target_sr=16000)
+        print("what")
 
     if file_name == "nirit" or file_name == "yaron":
         audio = audio[1000:]

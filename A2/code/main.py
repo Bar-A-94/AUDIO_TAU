@@ -3,6 +3,7 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 import pickle as pkl
+import soundfile as sf
 
 def q1c_mel_spec(input_dir, output_dir, window_size=0.025, hop_size=0.01, n_mels=80):
     """
@@ -51,6 +52,7 @@ def q1c_mel_spec(input_dir, output_dir, window_size=0.025, hop_size=0.01, n_mels
     
     return mel_dict
 
+
 def q3b_DTW(mel_1, mel_2):
     """
     Perform Dynamic Time Warping (DTW) to calculate the alignment cost between two Mel spectrograms.
@@ -80,41 +82,152 @@ def q3b_DTW(mel_1, mel_2):
                                                 dtw_cost[i - 1, j],    # Insertion
                                                 dtw_cost[i, j - 1])    # Deletion
             
-    return dtw_cost[mel_1.shape[1] - 1, mel_2.shape[1] - 1]
+    # Compute the alignment path length by backtracking
+    i, j = mel_1.shape[1] - 1, mel_2.shape[1] - 1
+    path_length = 0
 
-def q3_distance_matrix(mel_dict):
+    while i > 0 or j > 0:
+        path_length += 1
+        if i > 0 and j > 0 and dtw_cost[i - 1, j - 1] <= dtw_cost[i - 1, j] and dtw_cost[i - 1, j - 1] <= dtw_cost[i, j - 1]:
+            i, j = i - 1, j - 1  # Match
+        elif i > 0 and (j == 0 or dtw_cost[i - 1, j] <= dtw_cost[i, j - 1]):
+            i -= 1  # Insertion
+        else:
+            j -= 1  # Deletion
 
-    distance_matrix = np.zeros((4,10,10))
-    db = "rom"
-    for x, name in enumerate(["neta", "avital","yaron","guy"]):
+    path_length += 1  # Include the starting point (0, 0)
+            
+    return dtw_cost[mel_1.shape[1] - 1, mel_2.shape[1] - 1], path_length
+
+def q3_distance_matrix(mel_dict, agc=False):
+    distance_matrix = np.zeros((4, 10, 10))
+    db = "bar"
+    for x, name in enumerate(["neta", "avital", "yaron", "guy"]):
         for i in range(10):
             for j in range(10):
-                distance_matrix[x, i, j]=q3b_DTW(mel_dict[name +"_" + str(i)], mel_dict[db + "_" + str(j)])
+                distance_matrix[x, i, j], path_length = q3b_DTW(mel_dict[name + "_" + str(i)], mel_dict[db + "_" + str(j)])
 
-        # Plot heatmaps for each table with values inside
-        plt.figure(figsize=(10, 8))
-        # Normalize each row separately
-        normalized = np.zeros_like(distance_matrix[x])
-        for t in range(distance_matrix[x].shape[0]):  # For each time step
-            row_min = distance_matrix[x][t, :].min()
-            row_max = distance_matrix[x][t, :].max()
-            if row_max > row_min:  # Avoid division by zero
-                normalized[t, :] = (distance_matrix[x][t, :] - row_min) / (row_max - row_min)
-            else:
-                normalized[t, :] = 0
-        heatmap = plt.imshow(normalized, cmap='viridis', interpolation='nearest')
-        plt.colorbar(label='DTW Distance')
-        plt.title(f"Heatmap of DTW Distances for {name}", fontsize=14)
-        plt.xlabel("Bar Index")
-        plt.ylabel(f"{name} Index")
-        plt.xticks(ticks=np.arange(10), labels=[f"Bar_{i}" for i in range(10)])
-        plt.yticks(ticks=np.arange(10), labels=[f"{name}_{i}" for i in range(10)])
+                # Check for the dtw calculation
+                # print(name, i, j)
+                # print(distance_matrix[x,i,j])
+                # a1, sr = librosa.load(os.path.join(output_dir,"audio_files", "agc_segmented",name + "_" + str(i) +".wav"),sr=16000)
+                # a2, sr = librosa.load(os.path.join(output_dir,"audio_files", "agc_segmented",db + "_" + str(j) +".wav"),sr=16000)
+                # D, wp = librosa.sequence.dtw(mel_dict[name + "_" + str(i)], mel_dict[db + "_" + str(j)], metric='euclidean')
+                # print(D[-1,-1])
+
+                if agc:
+                    distance_matrix[x,i,j] = distance_matrix[x,i,j]/ path_length
+
+        # Plot the heatmap
+        plt.figure(figsize=(12, 10))
+        heatmap = plt.imshow(distance_matrix[x], cmap='coolwarm', interpolation='nearest')
+        plt.colorbar(label='Normalized DTW Distance')
+        plt.title(f"Heatmap of DTW Distances for {name}", fontsize=16)
+        plt.xlabel("Bar Index", fontsize=12)
+        plt.ylabel(f"{name} Index", fontsize=12)
+        plt.xticks(ticks=np.arange(10), labels=[f"Bar_{i}" for i in range(10)], fontsize=10)
+        plt.yticks(ticks=np.arange(10), labels=[f"{name}_{i}" for i in range(10)], fontsize=10)
+
+
+        # Add text and rectangles for minimum values
         for i in range(10):
+            # Find minimum value and its column index for this row
+            min_col = np.argmin(distance_matrix[x][i])
+            
+            # Add text for all values in this row
             for j in range(10):
-                plt.text(j, i, f"{distance_matrix[x][i, j]:.2f}",
-                     ha="center", va="center", color="white" if heatmap.norm(distance_matrix[x][i, j]) > 0.5 else "black")
-    plt.tight_layout()
-    plt.show()
+                plt.text(j, i, f"{distance_matrix[x][i, j]:.4f}",
+                        ha="center", va="center",
+                        zorder=10)
+            
+            # Add rectangle around minimum value
+            plt.gca().add_patch(
+                plt.Rectangle(
+                    (min_col - 0.5, i - 0.5),  # Bottom-left corner
+                    1,  # Width
+                    1,  # Height
+                    edgecolor="black",
+                    linewidth=2,
+                    facecolor="none",  # No fill
+                    zorder=11
+                )
+            )
+                
+        # Save the plot
+        plt.tight_layout()
+        os.makedirs(os.path.join("plots"), exist_ok=True)
+        filename = f"DTW_distance_matrix{'_agc' if agc else ''}_{name}.png"
+        plt.savefig(os.path.join("A2", "resources","plots", filename)) 
+        plt.close()
+        print(f"Heatmap saved for {name}: {filename}")
+
+def moving_average_ignore_zeros(arr, window_size):
+        cumsum = np.cumsum(np.insert(arr, 0, 0))
+        nonzero_count = np.cumsum(np.insert(arr != 0, 0, 0))  # Count of non-zero elements
+        
+        # Compute sums of the windows
+        window_sums = cumsum[window_size:] - cumsum[:-window_size]
+        # Compute the number of non-zero elements in each window
+        effective_window_sizes = nonzero_count[window_size:] - nonzero_count[:-window_size]
+        
+        # Avoid division by zero by setting window sizes to 1 where all values are zero
+        effective_window_sizes[effective_window_sizes == 0] = 1
+        moving_avg = window_sums / effective_window_sizes
+        
+        # Pad the result to match the original array size
+        pad_size = len(arr) - len(moving_avg)
+        return np.pad(moving_avg, (pad_size, 0), mode='reflect')
+
+def apply_agc(name, digit, desired_RMS=0.035):
+    # Paths
+    input_path = os.path.join("A2", "resources", "audio_files", "segmented", name + f"_{digit}.wav")
+    output_path = os.path.join("A2", "resources", "audio_files", "agc_segmented", name + f"_{digit}.wav")
+
+    # Load audio with librosa
+    target_sr = 16000
+    audio, sr = librosa.load(input_path, sr=target_sr)  # Automatically resamples to `target_sr`
+
+    # Frame parameters
+    window_size = 0.025  # 25 ms
+    hop_size = 0.01      # 10 ms
+    hop_length = int(hop_size * target_sr)
+    n_fft = int(window_size * target_sr)
+
+    # Calculate RMS and gain
+    rms = librosa.feature.rms(y=audio, frame_length=n_fft, hop_length=hop_length)[0]
+    moving_avg_rms = moving_average_ignore_zeros(rms, 100)
+    gain_smoothed = desired_RMS / moving_avg_rms
+    gain_smoothed = np.clip(gain_smoothed, 0.1, 10)  # Prevent excessive gain
+
+    # Initialize overlap-add buffers
+    audio_agc = np.zeros_like(audio)
+    overlap_count = np.zeros_like(audio)
+
+    # Apply gain with overlap-add
+    for i, g in enumerate(gain_smoothed):
+        start = i * hop_length
+        end = min(start + n_fft, len(audio))
+        window = np.hanning(end - start)  # Apply a window function
+        audio_agc[start:end] += audio[start:end] * g * window
+        overlap_count[start:end] += window
+
+    # Normalize by overlap count
+    nonzero_indices = overlap_count > 0
+    audio_agc[nonzero_indices] /= overlap_count[nonzero_indices]
+
+    # Avoid overflow
+    audio_agc = np.clip(audio_agc, -1.0, 1.0)
+
+
+    # Save the processed audio
+    sf.write(output_path, audio_agc, target_sr)
+    print(f"AGC saved: {output_path}")
+
+def agc_for_all():
+    for name in ["bar","neta","avital","yaron", "guy", "roni", "nirit", "rom", "ohad"]:
+        for digit in range(10):
+            apply_agc(name, digit)
+        
 
 def q4_collapse_B(string):
     collapsed = ""
@@ -346,17 +459,24 @@ def plot_pred_backward(name, backtrace_matrix, labels, most_probable_path):
     plt.close()
     print(f"{name} plot saved: {os.path.join(output_dir, 'plots')}")
 
+
 if __name__ == "__main__":
     # Initialize
     input_dir = os.path.join("A2", "resources", "audio_files", "segmented")
+    agc_dir = os.path.join("A2", "resources", "audio_files", "agc_segmented")
     output_dir = os.path.join("A2", "resources")
-    # Class representative - bar, Training set - neta + avital + yaron + guy, Evaluation Set - roni + nirit + ? + ?
+    # Class representative - bar, Training set - neta + avital + yaron + guy, Evaluation Set - roni + nirit + rom + ohad
 
-    # Question 2 - Mel-spectrogram
-    mel_dict = q1c_mel_spec(input_dir, os.path.join(output_dir,"mel_spectrogram"))
+    # # Question 2 - Mel-spectrogram
+    # mel_dict = q1c_mel_spec(input_dir, os.path.join(output_dir,"mel_spectrogram", "raw"))
+    agc_for_all()
+    agc_mel_dict = q1c_mel_spec(agc_dir, os.path.join(output_dir,"mel_spectrogram", "agc"))
+
 
     # Question 3 - DTW
-    q3_distance_matrix(mel_dict)
+    # q3_distance_matrix(mel_dict)
+    q3_distance_matrix(agc_mel_dict, agc=True)
+
 
     # # Question 5 - CTC
     # pred, labels = q5a_initialize_pred()
