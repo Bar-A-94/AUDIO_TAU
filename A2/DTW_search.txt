@@ -1,0 +1,101 @@
+AGC with no db transform(18/80): 
+    bar neta has min DTW for  2  digits
+    bar avital has min DTW for  2  digits
+    bar yaron has min DTW for  2  digits
+    bar guy has min DTW for  4  digits
+    bar roni has min DTW for  3  digits
+    bar nirit has min DTW for  1  digits
+    bar rom has min DTW for  3  digits
+    bar ohad has min DTW for  1  digits
+
+Raw with db transform no normalization (29/80):
+    bar neta has min DTW for 3 digits
+    bar avital has min DTW for 4 digits
+    bar yaron has min DTW for 6 digits
+    bar guy has min DTW for 4 digits
+    bar roni has min DTW for 5 digits
+    bar nirit has min DTW for 4 digits
+    bar rom has min DTW for 1 digits
+    bar ohad has min DTW for 2 digits
+
+Raw with db transform & path normalization (27/80):
+    bar neta has min DTW for 2 digits
+    bar avital has min DTW for 3 digits
+    bar yaron has min DTW for 5 digits
+    bar guy has min DTW for 2 digits
+    bar roni has min DTW for 7 digits
+    bar nirit has min DTW for 5 digits
+    bar rom has min DTW for 1 digits
+    bar ohad has min DTW for 2 digits
+
+AGC with db transform & path normaliaztion (40/80):
+    bar neta has min DTW for 3 digits
+    bar avital has min DTW for 6 digits
+    bar yaron has min DTW for 8 digits
+    bar guy has min DTW for 4 digits
+    bar roni has min DTW for 5 digits
+    bar nirit has min DTW for 5 digits
+    bar rom has min DTW for 7 digits
+    bar ohad has min DTW for 2 digits
+
+Raw with db transform & + normalization (37/80):
+    bar neta has min DTW for 4 digits
+    bar avital has min DTW for 6 digits
+    bar yaron has min DTW for 6 digits
+    bar guy has min DTW for 3 digits
+    bar roni has min DTW for 6 digits
+    bar nirit has min DTW for 5 digits
+    bar rom has min DTW for 4 digits
+    bar ohad has min DTW for 3 digits
+    
+AGC with db transform & + normaliaztion (42/80):
+    bar neta has min DTW for 5 digits
+    bar avital has min DTW for 4 digits
+    bar yaron has min DTW for 8 digits
+    bar guy has min DTW for 4 digits
+    bar roni has min DTW for 7 digits
+    bar nirit has min DTW for 6 digits
+    bar rom has min DTW for 6 digits
+    bar ohad has min DTW for 2 digits
+
+Raw with db transform & * normalization (36/80):
+    bar neta has min DTW for 3 digits
+    bar avital has min DTW for 6 digits
+    bar yaron has min DTW for 6 digits
+    bar guy has min DTW for 3 digits
+    bar roni has min DTW for 7 digits
+    bar nirit has min DTW for 4 digits
+    bar rom has min DTW for 3 digits
+    bar ohad has min DTW for 4 digits
+    
+AGC with db transform & * normaliaztion (31/80):
+    bar neta has min DTW for 3 digits
+    bar avital has min DTW for 5 digits
+    bar yaron has min DTW for 7 digits
+    bar guy has min DTW for 3 digits
+    bar roni has min DTW for 6 digits
+    bar nirit has min DTW for 2 digits
+    bar rom has min DTW for 4 digits
+    bar ohad has min DTW for 1 digits
+
+Raw with db transform & max normalization (30/80):
+    bar neta has min DTW for 3 digits
+    bar avital has min DTW for 5 digits
+    bar yaron has min DTW for 6 digits
+    bar guy has min DTW for 4 digits
+    bar roni has min DTW for 5 digits
+    bar nirit has min DTW for 4 digits
+    bar rom has min DTW for 1 digits
+    bar ohad has min DTW for 2 digits
+  
+AGC with db transform & max normaliaztion (41/80):
+    bar neta has min DTW for 3 digits
+    bar avital has min DTW for 6 digits
+    bar yaron has min DTW for 8 digits
+    bar guy has min DTW for 4 digits
+    bar roni has min DTW for 5 digits
+    bar nirit has min DTW for 4 digits
+    bar rom has min DTW for 7 digits
+    bar ohad has min DTW for 3 digits
+
+

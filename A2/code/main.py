@@ -20,6 +20,7 @@ def q1c_mel_spec(input_dir, output_dir, window_size=0.025, hop_size=0.01, n_mels
     # Basic calculations
     n_fft=int(window_size * 16000)
     hop_length=int(hop_size * 16000)
+    win_length = int(window_size * 16000)   
     mel_dict = {}
 
     # Iterate through all files in the input directory
@@ -30,7 +31,9 @@ def q1c_mel_spec(input_dir, output_dir, window_size=0.025, hop_size=0.01, n_mels
             audio, sr = librosa.load(file_path, sr=16000)
 
             # Calculate the Mel spectrogram
-            mel_dict[os.path.splitext(file_name)[0]] = librosa.feature.melspectrogram(y=audio, sr=sr, n_fft=n_fft, hop_length=hop_length, n_mels=n_mels)
+            mel_spec = librosa.feature.melspectrogram(y=audio, sr=sr, n_fft=n_fft, hop_length=hop_length, win_length=win_length, n_mels=n_mels)
+            mel_spec_db = librosa.power_to_db(mel_spec, ref=np.max)
+            mel_dict[os.path.splitext(file_name)[0]] = mel_spec_db
 
             # Save the spectrogram as an image
             output_path = os.path.join(output_dir, f"{os.path.splitext(file_name)[0]}_mel.png")
@@ -51,6 +54,7 @@ def q1c_mel_spec(input_dir, output_dir, window_size=0.025, hop_size=0.01, n_mels
             print(f"Spectrogram saved: {output_path}")
     
     return mel_dict
+
 
 
 def q3b_DTW(mel_1, mel_2):
@@ -99,24 +103,17 @@ def q3b_DTW(mel_1, mel_2):
             
     return dtw_cost[mel_1.shape[1] - 1, mel_2.shape[1] - 1], path_length
 
-def q3_distance_matrix(mel_dict, agc=False):
+def q3_distance_matrix(mel_dict, db, target, normalize=False):
     distance_matrix = np.zeros((4, 10, 10))
-    db = "bar"
-    for x, name in enumerate(["neta", "avital", "yaron", "guy"]):
+    db = db
+    for x, name in enumerate(target):
         for i in range(10):
             for j in range(10):
                 distance_matrix[x, i, j], path_length = q3b_DTW(mel_dict[name + "_" + str(i)], mel_dict[db + "_" + str(j)])
 
-                # Check for the dtw calculation
-                # print(name, i, j)
-                # print(distance_matrix[x,i,j])
-                # a1, sr = librosa.load(os.path.join(output_dir,"audio_files", "agc_segmented",name + "_" + str(i) +".wav"),sr=16000)
-                # a2, sr = librosa.load(os.path.join(output_dir,"audio_files", "agc_segmented",db + "_" + str(j) +".wav"),sr=16000)
-                # D, wp = librosa.sequence.dtw(mel_dict[name + "_" + str(i)], mel_dict[db + "_" + str(j)], metric='euclidean')
-                # print(D[-1,-1])
+                if normalize:
+                    distance_matrix[x,i,j] = distance_matrix[x,i,j]/(len(mel_dict[name + "_" + str(i)][1]) + len(mel_dict[db + "_" + str(j)][1]))
 
-                if agc:
-                    distance_matrix[x,i,j] = distance_matrix[x,i,j]/ path_length
 
         # Plot the heatmap
         plt.figure(figsize=(12, 10))
@@ -128,11 +125,13 @@ def q3_distance_matrix(mel_dict, agc=False):
         plt.xticks(ticks=np.arange(10), labels=[f"Bar_{i}" for i in range(10)], fontsize=10)
         plt.yticks(ticks=np.arange(10), labels=[f"{name}_{i}" for i in range(10)], fontsize=10)
 
-
+        count = 0
         # Add text and rectangles for minimum values
         for i in range(10):
             # Find minimum value and its column index for this row
             min_col = np.argmin(distance_matrix[x][i])
+            if min_col == i:
+                count += 1
             
             # Add text for all values in this row
             for j in range(10):
@@ -152,11 +151,12 @@ def q3_distance_matrix(mel_dict, agc=False):
                     zorder=11
                 )
             )
+        print(db, name, "has min DTW for", count, "digits")
                 
         # Save the plot
         plt.tight_layout()
         os.makedirs(os.path.join("plots"), exist_ok=True)
-        filename = f"DTW_distance_matrix{'_agc' if agc else ''}_{name}.png"
+        filename = f"DTW_distance_matrix{'_agc' if normalize else ''}_{name}.png"
         plt.savefig(os.path.join("A2", "resources","plots", filename)) 
         plt.close()
         print(f"Heatmap saved for {name}: {filename}")
@@ -186,6 +186,7 @@ def apply_agc(name, digit, desired_RMS=0.035):
     # Load audio with librosa
     target_sr = 16000
     audio, sr = librosa.load(input_path, sr=target_sr)  # Automatically resamples to `target_sr`
+
 
     # Frame parameters
     window_size = 0.025  # 25 ms
@@ -218,16 +219,19 @@ def apply_agc(name, digit, desired_RMS=0.035):
     # Avoid overflow
     audio_agc = np.clip(audio_agc, -1.0, 1.0)
 
+    # Trim silence
+    audio_agc, _ = librosa.effects.trim(audio_agc, top_db=20)
 
     # Save the processed audio
     sf.write(output_path, audio_agc, target_sr)
-    print(f"AGC saved: {output_path}")
+    print(f"AGC saved: {output_path}")    
 
 def agc_for_all():
     for name in ["bar","neta","avital","yaron", "guy", "roni", "nirit", "rom", "ohad"]:
         for digit in range(10):
             apply_agc(name, digit)
-        
+
+
 
 def q4_collapse_B(string):
     collapsed = ""
@@ -465,30 +469,34 @@ if __name__ == "__main__":
     input_dir = os.path.join("A2", "resources", "audio_files", "segmented")
     agc_dir = os.path.join("A2", "resources", "audio_files", "agc_segmented")
     output_dir = os.path.join("A2", "resources")
-    # Class representative - bar, Training set - neta + avital + yaron + guy, Evaluation Set - roni + nirit + rom + ohad
+    
+    db = "bar"
+    training_set = ["neta", "avital", "yaron", "guy"]
+    evaluation_set = ["roni", "nirit" ,"rom", "ohad"]
 
     # # Question 2 - Mel-spectrogram
-    # mel_dict = q1c_mel_spec(input_dir, os.path.join(output_dir,"mel_spectrogram", "raw"))
+    mel_dict = q1c_mel_spec(input_dir, os.path.join(output_dir,"mel_spectrogram", "raw"))
     agc_for_all()
     agc_mel_dict = q1c_mel_spec(agc_dir, os.path.join(output_dir,"mel_spectrogram", "agc"))
 
 
     # Question 3 - DTW
-    # q3_distance_matrix(mel_dict)
-    q3_distance_matrix(agc_mel_dict, agc=True)
-
+    q3_distance_matrix(mel_dict, db, training_set)
+    q3_distance_matrix(mel_dict, db, evaluation_set)
+    q3_distance_matrix(agc_mel_dict, db, training_set, normalize=True)
+    q3_distance_matrix(agc_mel_dict, db, evaluation_set, normalize=True)
 
     # # Question 5 - CTC
-    # pred, labels = q5a_initialize_pred()
-    # print(q5_ctc_forward("aba",labels, pred)) # 0.088
+    pred, labels = q5a_initialize_pred()
+    print(q5_ctc_forward("aba",labels, pred)) # 0.088
 
     # # Question 6 - CTC align
-    # print(q6_ctc_align("q6d&e","aba", labels, pred)) # (['^', 'a', 'b', 'a', '^'], np.float64(0.04032000211715699))
+    print(q6_ctc_align("q6d&e","aba", labels, pred)) # (['^', 'a', 'b', 'a', '^'], np.float64(0.04032000211715699))
     
     # # Question 7
-    # data = pkl.load(open('A2/supplied_files/force_align.pkl', 'rb'))
-    # labels = {v: k for k, v in data['label_mapping'].items()}
-    # print(q6_ctc_align("q7d&e",data['text_to_align'], labels, data['acoustic_model_out_probs'])) # (['^', '^', '^', '^', '^', '^', '^', 't', 'h', 'e', '^', 'n', 'n', '^', ' ', ' ', '^', 'g', '^', 'o', '^', 'o', 'd', '^', '^', '^', '^', 'b', 'y', '^', 'e', '^', '^', '^', '^', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', '^', 's', '^', 'a', 'i', 'd', ' ', ' ', ' ', ' ', ' ', ' ', 'r', 'r', 'a', 't', 't', '^', '^', 's', '^', '^', '^', '^', '^', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', 't', 'h', 'e', 'y', ' ', ' ', ' ', ' ', ' ', ' ', '^', 'w', '^', 'a', 'n', 'n', 't', 't', '^', '^', '^', '^', '^', '^', '^', ' ', ' ', '^', 'h', 'o', 'm', '^', 'e', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^'], np.float64(1.5022820406499606e-30))
+    data = pkl.load(open('A2/supplied_files/force_align.pkl', 'rb'))
+    labels = {v: k for k, v in data['label_mapping'].items()}
+    print(q6_ctc_align("q7d&e",data['text_to_align'], labels, data['acoustic_model_out_probs'])) # (['^', '^', '^', '^', '^', '^', '^', 't', 'h', 'e', '^', 'n', 'n', '^', ' ', ' ', '^', 'g', '^', 'o', '^', 'o', 'd', '^', '^', '^', '^', 'b', 'y', '^', 'e', '^', '^', '^', '^', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', '^', 's', '^', 'a', 'i', 'd', ' ', ' ', ' ', ' ', ' ', ' ', 'r', 'r', 'a', 't', 't', '^', '^', 's', '^', '^', '^', '^', '^', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', 't', 'h', 'e', 'y', ' ', ' ', ' ', ' ', ' ', ' ', '^', 'w', '^', 'a', 'n', 'n', 't', 't', '^', '^', '^', '^', '^', '^', '^', ' ', ' ', '^', 'h', 'o', 'm', '^', 'e', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^'], np.float64(1.5022820406499606e-30))
 
 
 
