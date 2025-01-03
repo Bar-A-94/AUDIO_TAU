@@ -1,13 +1,3 @@
-AGC with no db transform(18/80): 
-    bar neta has min DTW for  2  digits
-    bar avital has min DTW for  2  digits
-    bar yaron has min DTW for  2  digits
-    bar guy has min DTW for  4  digits
-    bar roni has min DTW for  3  digits
-    bar nirit has min DTW for  1  digits
-    bar rom has min DTW for  3  digits
-    bar ohad has min DTW for  1  digits
-
 Raw with db transform no normalization (29/80):
     bar neta has min DTW for 3 digits
     bar avital has min DTW for 4 digits
