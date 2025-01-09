@@ -2,7 +2,11 @@ import librosa
 import os
 import numpy as np
 import matplotlib.pyplot as plt
+import pandas as pd
 import pickle as pkl
+import seaborn as sns
+from pathlib import Path
+
 
 def q1c_mel_spec(input_dir, output_dir, window_size=0.025, hop_size=0.01, n_mels=80):
     """
@@ -155,9 +159,64 @@ def q3_distance_matrix(mel_dict, db, target, normalize=False):
         plt.tight_layout()
         os.makedirs(os.path.join("plots"), exist_ok=True)
         filename = f"DTW_distance_matrix{'_agc' if normalize else ''}_{name}.png"
-        plt.savefig(os.path.join("A2", "resources","plots", filename)) 
+        plt.savefig(os.path.join(grandparent_dir,"A2", "resources","plots", filename))
         plt.close()
         print(f"Heatmap saved for {name}: {filename}")
+    return distance_matrix
+
+def find_max_precision_threshold(distance_mat, agc=False):
+    best_threshold = 0
+    best_precision = 0
+
+    thresh_range = np.arange(1000, 40000) if not agc else np.arange(1,150,0.05)
+
+    for mid_threshold in thresh_range:
+
+        # Threshold the matrix
+        thresholded_matrix = (distance_mat <= mid_threshold).astype(int)
+
+        # Calculate recall against stacked identity matrix
+        #Note that we chose precision because accuracy is a bad metric - Works best when all zeros are chosen
+        diagonal_sum = 0
+        for i in range(4):  # Iterate through the 4 matrices in the tensor
+            diagonal_sum += np.trace(thresholded_matrix[i])
+        if diagonal_sum < 10:
+            continue ## I dont want places where only the smallest value is entered, and precision is 1.0
+        total_ones = np.sum(thresholded_matrix)
+        if total_ones == 0:
+            precision = 0
+        else:
+            precision = diagonal_sum / total_ones
+
+        if precision > best_precision:
+                best_precision = precision
+                best_threshold = mid_threshold
+
+    return best_threshold, best_precision
+
+def calc_precision_over_mat(matrix, threshold):
+    thresholded_matrix = (matrix <= threshold).astype(int)
+    diagonal_sum = 0
+    for i in range(4):  # Iterate through the 4 matrices in the tensor
+        diagonal_sum += np.trace(thresholded_matrix[i])
+    total_ones = np.sum(thresholded_matrix)
+    if total_ones == 0:
+        precision = 0
+    else:
+        precision = diagonal_sum / total_ones
+    return precision
+
+def build_confusion_matrices(tensor, threshold, name):
+    confusion_matrix = np.sum((tensor <= threshold).astype(int), axis=0)
+    plt.figure(figsize=(10, 7))
+    sns.heatmap(confusion_matrix, annot=True, fmt="d", cmap="Blues")
+    plt.xlabel("True")
+    plt.ylabel("Predicted")
+    plt.title(f"Validation Set Confusion Matrix")
+    plt.savefig(os.path.join(grandparent_dir,"A2", "resources","plots", f"q3g_validation_{name}.png"))
+    plt.close()
+    return confusion_matrix
+
 
 
 
@@ -209,7 +268,8 @@ def q5_ctc_forward(string, labels, matrix):
             if l > 1 and extended_string[l] != extended_string[l - 2]:
                 forward_matrix[t, l] += prob_l * forward_matrix[t - 1, l - 2]
     extended_labels = {idx: char for idx, char in enumerate(extended_string)}
-    plot_pred_forward("q5d_forward_matrix", forward_matrix, extended_labels)
+    #plot_pred_forward("q5d_forward_matrix", forward_matrix, extended_labels)
+    plot_pred_forward("q5d_pred_matrix", matrix, {v: k for k, v in labels.items()})
     return forward_matrix[-1, -1] + forward_matrix[-1, -2]
 
 def q6_ctc_align(question_number, string, labels, matrix):
@@ -297,7 +357,7 @@ def plot_pred_forward(name, pred, labels, aligned=None):
     y_ticks = [labels[i] for i in range(pred.shape[1])]
 
     # Create the plot
-    plt.figure(figsize=(pred.T.shape[0] * 0.6, pred.T.shape[0] * 0.7))
+    plt.figure(figsize=(pred.T.shape[0]*1.6, pred.T.shape[0]*1.6))
     
     # Normalize each column separately
     normalized_pred = np.zeros_like(pred)
@@ -320,7 +380,7 @@ def plot_pred_forward(name, pred, labels, aligned=None):
         plt.xlabel('Time Step')
     plt.ylabel('Labels')
     plt.yticks(ticks=np.arange(len(y_ticks)), labels=y_ticks)
-    plt.title('Prediction Heatmap (Column Normalized)')
+    plt.title('Pred Matrix')
     
     # Add original values to each cell
     for i in range(pred.shape[1]):  # Iterate over rows (labels)
@@ -394,42 +454,72 @@ def plot_pred_backward(name, backtrace_matrix, labels, most_probable_path):
 
 if __name__ == "__main__":
     # Initialize
-    input_dir = os.path.join("A2", "resources", "audio_files", "segmented")
-    agc_dir = os.path.join("A2", "resources", "audio_files", "agc_segmented")
-    output_dir = os.path.join("A2", "resources")
+    grandparent_dir = Path(__file__).resolve().parent.parent.parent
+    input_dir = os.path.join(grandparent_dir,"A2", "resources", "audio_files", "segmented")
+    output_dir = os.path.join(grandparent_dir, "A2", "resources")
+    agc_dir = os.path.join(grandparent_dir,"A2", "resources", "audio_files", "agc_segmented")
     
     db = "bar"
     training_set = ["neta", "avital", "yaron", "guy"]
     evaluation_set = ["roni", "nirit" ,"rom", "ohad"]
-
-    # # Question 2 - Mel-spectrogram
+    
+    # Question 2 - Mel-spectrogram
     mel_dict = q1c_mel_spec(input_dir, os.path.join(output_dir,"mel_spectrogram", "raw"))
     agc_mel_dict = q1c_mel_spec(agc_dir, os.path.join(output_dir,"mel_spectrogram", "agc"))
-
-
+    
+    
     # Question 3 - DTW
-    q3_distance_matrix(mel_dict, db, training_set)
-    q3_distance_matrix(mel_dict, db, evaluation_set)
-    q3_distance_matrix(agc_mel_dict, db, training_set, normalize=True)
-    q3_distance_matrix(agc_mel_dict, db, evaluation_set, normalize=True)
+    training_distance_mat = q3_distance_matrix(mel_dict, db, training_set)
+    thresh, precision = find_max_precision_threshold(training_distance_mat)
+    print("Clean try - no agc, no path norm")
+    print("For threshold:", thresh, "precision is:", precision)
+    
+    eval_distance_matrix = q3_distance_matrix(mel_dict, db, evaluation_set)
+    conf_matrices = build_confusion_matrices(eval_distance_matrix, thresh, "normal")
+    eval_precision = calc_precision_over_mat(eval_distance_matrix, thresh)
+    print("Eval precision", eval_precision)
 
-    # # Question 5 - CTC
+
+    training_distance_mat = q3_distance_matrix(agc_mel_dict, db, training_set, normalize=True)
+    thresh, precision = find_max_precision_threshold(training_distance_mat, True)
+    print("AGC + Path norm")
+    print("For threshold:", thresh, "precision is:", precision)
+    
+    eval_distance_matrix_agc_norm = q3_distance_matrix(agc_mel_dict, db, evaluation_set, normalize=True)
+    conf_matrices_agc_norm = build_confusion_matrices(eval_distance_matrix_agc_norm, thresh, "agc & norm")
+    eval_precision = calc_precision_over_mat(eval_distance_matrix_agc_norm, thresh)
+    print("Eval presicion", eval_precision)
+
+
+    training_distance_mat = q3_distance_matrix(mel_dict, db, training_set, normalize=True)
+    thresh, precision = find_max_precision_threshold(training_distance_mat, True)
+    print("Path norm")
+    print("For threshold:", thresh, "precision is:", precision)
+
+    eval_distance_matrix_norm = q3_distance_matrix(mel_dict, db, evaluation_set, normalize=True)
+    conf_matrices_norm = build_confusion_matrices(eval_distance_matrix_norm, thresh, "norm")
+    eval_precision = calc_precision_over_mat(eval_distance_matrix_norm, thresh)
+    print("Eval presicion", eval_precision)
+
+    training_distance_mat = q3_distance_matrix(agc_mel_dict, db, training_set)
+    thresh, precision = find_max_precision_threshold(training_distance_mat)
+    print("AGC")
+    print("For threshold:", thresh, "precision is:", precision)
+    
+    eval_distance_matrix_agc = q3_distance_matrix(agc_mel_dict, db, evaluation_set)
+    conf_matrices_agc = build_confusion_matrices(eval_distance_matrix_agc, thresh, "agc")
+    eval_precision = calc_precision_over_mat(eval_distance_matrix_agc, thresh)
+    print("Eval presicion", eval_precision)
+
+
+    # Question 5 - CTC
     pred, labels = q5a_initialize_pred()
     print(q5_ctc_forward("aba",labels, pred)) # 0.088
 
-    # # Question 6 - CTC align
+    # Question 6 - CTC align
     print(q6_ctc_align("q6d&e","aba", labels, pred)) # (['^', 'a', 'b', 'a', '^'], np.float64(0.04032000211715699))
     
-    # # Question 7
+    # Question 7
     data = pkl.load(open('A2/supplied_files/force_align.pkl', 'rb'))
     labels = {v: k for k, v in data['label_mapping'].items()}
     print(q6_ctc_align("q7d&e",data['text_to_align'], labels, data['acoustic_model_out_probs'])) # (['^', '^', '^', '^', '^', '^', '^', 't', 'h', 'e', '^', 'n', 'n', '^', ' ', ' ', '^', 'g', '^', 'o', '^', 'o', 'd', '^', '^', '^', '^', 'b', 'y', '^', 'e', '^', '^', '^', '^', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', '^', 's', '^', 'a', 'i', 'd', ' ', ' ', ' ', ' ', ' ', ' ', 'r', 'r', 'a', 't', 't', '^', '^', 's', '^', '^', '^', '^', '^', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', 't', 'h', 'e', 'y', ' ', ' ', ' ', ' ', ' ', ' ', '^', 'w', '^', 'a', 'n', 'n', 't', 't', '^', '^', '^', '^', '^', '^', '^', ' ', ' ', '^', 'h', 'o', 'm', '^', 'e', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^', '^'], np.float64(1.5022820406499606e-30))
-
-
-
-
-
-
-    
-
-
